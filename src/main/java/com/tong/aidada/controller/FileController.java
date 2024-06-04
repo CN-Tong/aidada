@@ -4,18 +4,13 @@ import cn.hutool.core.io.FileUtil;
 import com.tong.aidada.common.BaseResponse;
 import com.tong.aidada.common.ErrorCode;
 import com.tong.aidada.common.ResultUtils;
+import com.tong.aidada.constant.FileConstant;
+import com.tong.aidada.exception.BusinessException;
 import com.tong.aidada.manager.CosManager;
 import com.tong.aidada.model.dto.file.UploadFileRequest;
 import com.tong.aidada.model.entity.User;
 import com.tong.aidada.model.enums.FileUploadBizEnum;
 import com.tong.aidada.service.UserService;
-import com.tong.aidada.constant.FileConstant;
-import com.tong.aidada.exception.BusinessException;
-
-import java.io.File;
-import java.util.Arrays;
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +18,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.io.File;
+import java.util.Arrays;
 
 /**
  * 文件接口
