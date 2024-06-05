@@ -66,7 +66,7 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question> i
         // 修改数据时，有参数则校验
         // 补充校验规则
         if (StringUtils.isNotBlank(questionContent)) {
-            ThrowUtils.throwIf(questionContent.length() > 800, ErrorCode.PARAMS_ERROR, "题目内容过长");
+            ThrowUtils.throwIf(questionContent.length() > 2000, ErrorCode.PARAMS_ERROR, "题目内容过长");
         }
         if (appId != null) {
             App app = appService.getById(appId);

@@ -10,10 +10,14 @@ import com.tong.aidada.common.ResultUtils;
 import com.tong.aidada.constant.UserConstant;
 import com.tong.aidada.exception.BusinessException;
 import com.tong.aidada.exception.ThrowUtils;
+import com.tong.aidada.manager.AiManager;
 import com.tong.aidada.model.dto.question.*;
+import com.tong.aidada.model.entity.App;
 import com.tong.aidada.model.entity.Question;
 import com.tong.aidada.model.entity.User;
+import com.tong.aidada.model.enums.AppTypeEnum;
 import com.tong.aidada.model.vo.QuestionVO;
+import com.tong.aidada.service.AppService;
 import com.tong.aidada.service.QuestionService;
 import com.tong.aidada.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +41,12 @@ public class QuestionController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private AppService appService;
+
+    @Resource
+    private AiManager aiManager;
 
     // region 增删改查
 
@@ -235,6 +245,78 @@ public class QuestionController {
         boolean result = questionService.updateById(question);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
+    }
+
+    // endregion
+
+    // region AI生成题目功能
+
+    // 系统Prompt
+    private static final String GENERATE_QUESTION_SYSTEM_MESSAGE = "你是一位严谨的出题专家，我会给你如下信息：\n" +
+            "```\n" +
+            "应用名称，\n" +
+            "【【【应用描述】】】，\n" +
+            "应用类别，\n" +
+            "要生成的题目数，\n" +
+            "每个题目的选项数\n" +
+            "```\n" +
+            "\n" +
+            "请你根据上述信息，按照以下步骤来出题：\n" +
+            "1. 要求：题目和选项尽可能地短，题目不要包含序号，每题的选项数以我提供的为主，题目不能重复\n" +
+            "2. 严格按照下面的 json 格式输出题目和选项\n" +
+            "```\n" +
+            "[{\"options\":[{\"value\":\"选项内容\",\"key\":\"A\"},{\"value\":\"\",\"key\":\"B\"}],\"title\":\"题目标题\"}]\n" +
+            "```\n" +
+            "title 是题目，options 是选项，每个选项的 key 按照英文字母序（比如 A、B、C、D）以此类推，value 是选项内容\n" +
+            "3. 检查题目是否包含序号，若包含序号则去除序号\n" +
+            "4. 返回的题目列表格式必须为 JSON 数组";
+
+    /**
+     * 生成题目的用户消息
+     * @param app
+     * @param questionNumber
+     * @param optionNumber
+     * @return
+     */
+    private String getGenerateQuestionUserMessage(App app, int questionNumber, int optionNumber) {
+        StringBuilder userMessage = new StringBuilder();
+        userMessage.append(app.getAppName()).append("\n");
+        userMessage.append(app.getAppDesc()).append("\n");
+        userMessage.append(AppTypeEnum.getEnumByValue(app.getAppType()).getText() + "类").append("\n");
+        userMessage.append(questionNumber).append("\n");
+        userMessage.append(optionNumber);
+        return userMessage.toString();
+    }
+
+    /**
+     * AI生成题目内容
+     * @param aiGenerateQuestionRequest
+     * @return
+     */
+    @PostMapping("/ai_generate")
+    public BaseResponse<List<QuestionContentDTO>> aiGenerateQuestion(
+            @RequestBody AiGenerateQuestionRequest aiGenerateQuestionRequest){
+        // 校验aiGenerateQuestionRequest
+        ThrowUtils.throwIf(aiGenerateQuestionRequest == null, ErrorCode.PARAMS_ERROR);
+        // 获取参数
+        Long appId = aiGenerateQuestionRequest.getAppId();
+        int questionNumber = aiGenerateQuestionRequest.getQuestionNumber();
+        int optionNumber = aiGenerateQuestionRequest.getOptionNumber();
+        // 获取应用信息
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        // 封装Promot
+        String userMessage = getGenerateQuestionUserMessage(app, questionNumber, optionNumber);
+        // AI生成（通用不稳定同步请求）
+        String result = aiManager.doSyncUnstableRequest(GENERATE_QUESTION_SYSTEM_MESSAGE, userMessage);
+        // 截取[]及其内部
+        int start = result.indexOf("[");
+        int end = result.lastIndexOf("]");
+        String questionContentStr = result.substring(start, end + 1);
+        System.out.println("成功生成题目内容：" + questionContentStr);
+        // json转questionContentDTO列表
+        List<QuestionContentDTO> questionContentDTOList = JSONUtil.toList(questionContentStr, QuestionContentDTO.class);
+        return ResultUtils.success(questionContentDTOList);
     }
 
     // endregion

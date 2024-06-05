@@ -68,3 +68,6 @@ knife4j:
         api-rule: package
         api-rule-resources:
           - com.tong.aidada.controller
+# AI 配置
+ai:
+  apiKey: 686b22bf29f2965c7e45a9c5dfa60dc4.qh0UYEks4jDP02yl
