@@ -1,5 +1,4 @@
 # 公共配置文件
-
 spring:
   application:
     name: aidada-backend
@@ -18,13 +17,13 @@ spring:
   # 数据库配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/aidada
-    username: root
-    password: 123456
+    url: jdbc:mysql://${tong.datasource.host}:3306/aidada
+    username: ${tong.datasource.username}
+    password: ${tong.datasource.password}
   # Redis 配置
   redis:
     database: 6
-    host: localhost
+    host: ${tong.redis.host}
     port: 6379
     timeout: 5000
   # 文件上传
@@ -34,7 +33,7 @@ spring:
       max-file-size: 10MB
 server:
   address: 0.0.0.0
-  port: 8280
+  port: ${tong.server.port}
   servlet:
     context-path: /api
     session:
@@ -43,7 +42,7 @@ server:
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: false
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: ${tong.mybatis-plus.configuration.log-impl}
   global-config:
     db-config:
       logic-delete-field: isDelete # 全局逻辑删除的实体字段名
@@ -70,4 +69,4 @@ knife4j:
           - com.tong.aidada.controller
 # AI 配置
 ai:
-  apiKey: 686b22bf29f2965c7e45a9c5dfa60dc4.qh0UYEks4jDP02yl
+  apiKey: ${tong.ai.apiKey}
