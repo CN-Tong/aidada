@@ -231,6 +231,7 @@ public class AppController {
         }
         // 重置审核状态
         app.setReviewStatus(ReviewStatusEnum.REVIEWING.getValue());
+        app.setReviewMessage("");
         // 操作数据库
         boolean result = appService.updateById(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);

@@ -262,17 +262,18 @@ public class QuestionController {
             "```\n" +
             "\n" +
             "请你根据上述信息，按照以下步骤来出题：\n" +
-            "1. 要求：题目和选项尽可能地短，题目不要包含序号，每题的选项数以我提供的为主，题目不能重复\n" +
+            "1. 要求：题目和选项尽可能地短，题目不要包含序号。要生成的题目数以及每个题目的选项数必须严格等于我上面提供的，题目不能重复，应用类别为测评类的题目以开放题为主，应用类别为得分类的题目以客观题为主。出的题目要与应用名称相关，并参考应用描述\n" +
             "2. 严格按照下面的 json 格式输出题目和选项\n" +
             "```\n" +
-            "[{\"options\":[{\"value\":\"选项内容\",\"key\":\"A\"},{\"value\":\"\",\"key\":\"B\"}],\"title\":\"题目标题\"}]\n" +
+            "[{\"options\":[{\"result\":\"答案属性，例如 MBTI E/I、S/N、T/F、J/P中的I\",\"score\":10,\"value\":\"选项内容\",\"key\":\"A\"},{\"result\":\"答案属性，例如 MBTI E/I、S/N、T/F、J/P中的N\",\"score\":20,\"value\":\"\",\"key\":\"B\"}],\"title\":\"题目标题\"}]\n" +
             "```\n" +
-            "title 是题目，options 是选项，每个选项的 key 按照英文字母序（比如 A、B、C、D）以此类推，value 是选项内容\n" +
+            "其中 title 是题目，必须提供。options 是选项。如果应用类别是测评类则必须提供 result 来保存答案属性而不提供 score，如果应用类别是得分类则必须提供 score 来设置本题分数（保证同一道题的各个选项分数相等，当做这道题目的分数，同时保证所有题目的分数之和为100）而不提供 result。每个选项的 key 按照英文字母序（比如 A、B、C、D）以此类推，必须提供。value 是选项内容，必须提供\n" +
             "3. 检查题目是否包含序号，若包含序号则去除序号\n" +
             "4. 返回的题目列表格式必须为 JSON 数组";
 
     /**
      * 生成题目的用户消息
+     *
      * @param app
      * @param questionNumber
      * @param optionNumber
@@ -290,12 +291,13 @@ public class QuestionController {
 
     /**
      * AI生成题目内容
+     *
      * @param aiGenerateQuestionRequest
      * @return
      */
     @PostMapping("/ai_generate")
     public BaseResponse<List<QuestionContentDTO>> aiGenerateQuestion(
-            @RequestBody AiGenerateQuestionRequest aiGenerateQuestionRequest){
+            @RequestBody AiGenerateQuestionRequest aiGenerateQuestionRequest) {
         // 校验aiGenerateQuestionRequest
         ThrowUtils.throwIf(aiGenerateQuestionRequest == null, ErrorCode.PARAMS_ERROR);
         // 获取参数

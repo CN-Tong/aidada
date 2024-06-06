@@ -39,6 +39,7 @@ public class AiManager {
     public String doRequest(List<ChatMessage> messages, Boolean stream, Float temperature) {
         // 构造请求
         ChatCompletionRequest chatCompletionRequest = ChatCompletionRequest.builder()
+                .maxTokens(8192)
                 .model(Constants.ModelChatGLM4)
                 .stream(stream)
                 .invokeMethod(Constants.invokeMethod)
