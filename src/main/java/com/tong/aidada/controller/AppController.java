@@ -13,6 +13,8 @@ import com.tong.aidada.model.dto.app.AppQueryRequest;
 import com.tong.aidada.model.dto.app.AppUpdateRequest;
 import com.tong.aidada.model.entity.App;
 import com.tong.aidada.model.entity.User;
+import com.tong.aidada.model.enums.AppScoringStrategyEnum;
+import com.tong.aidada.model.enums.AppTypeEnum;
 import com.tong.aidada.model.enums.ReviewStatusEnum;
 import com.tong.aidada.model.vo.AppVO;
 import com.tong.aidada.service.AppService;
@@ -51,6 +53,11 @@ public class AppController {
     @PostMapping("/add")
     public BaseResponse<Long> addApp(@RequestBody AppAddRequest appAddRequest, HttpServletRequest request) {
         ThrowUtils.throwIf(appAddRequest == null, ErrorCode.PARAMS_ERROR);
+        // 得分类应用暂不支持AI评分
+        if (appAddRequest.getAppType() == AppTypeEnum.SCORE.getValue()
+                && appAddRequest.getScoringStrategy() == AppScoringStrategyEnum.AI.getValue()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "得分类应用暂不支持AI评分");
+        }
         // 在此处将实体类和 DTO 进行转换
         App app = new App();
         BeanUtils.copyProperties(appAddRequest, app);
@@ -214,6 +221,11 @@ public class AppController {
     public BaseResponse<Boolean> editApp(@RequestBody AppEditRequest appEditRequest, HttpServletRequest request) {
         if (appEditRequest == null || appEditRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 得分类应用暂不支持AI评分
+        if (appEditRequest.getAppType() == AppTypeEnum.SCORE.getValue()
+                && appEditRequest.getScoringStrategy() == AppScoringStrategyEnum.AI.getValue()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "得分类应用暂不支持AI评分");
         }
         // 在此处将实体类和 DTO 进行转换
         App app = new App();

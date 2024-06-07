@@ -42,21 +42,25 @@ public class CustomScoreScoringStrategy implements ScoringStrategy{
         List<QuestionContentDTO> questionContentDTOList = questionVO.getQuestionContent();
         // 初始化一个int，用于统计总得分
         int totalScore = 0;
-        // 遍历题目列表
-        for (QuestionContentDTO questionContentDTO : questionContentDTOList) {
-            // 遍历用户选择列表
-            for (String choice : choices) {
-                // 获取每道题目的选项
-                List<QuestionContentDTO.Option> optionList = questionContentDTO.getOptions();
-                // 遍历题目选项列表
-                for (QuestionContentDTO.Option option : optionList) {
-                    // 判断用户选的是哪个选项
-                    if (option.getKey().equals(choice)) {
-                        // 获取选项对应的score
-                        Integer score = Optional.of(option.getScore()).orElse(0);
-                        // 累加总得分
-                        totalScore += score;
-                    }
+        int choicesNum = choices.size();
+        int questionNum = questionContentDTOList.size();
+        // 遍历每一道题
+        for (int i = 0; i <Math.min(choicesNum, questionNum); i++) {
+            // 获取第 i 道 question
+            QuestionContentDTO questionContentDTO = questionContentDTOList.get(i);
+            // 获取第 i 个 choice
+            String choice = choices.get(i);
+            // 获取第 i 道 question 的选项
+            List<QuestionContentDTO.Option> optionList = questionContentDTO.getOptions();
+            // 遍历题目选项列表
+            for (QuestionContentDTO.Option option : optionList) {
+                // 判断用户选的是哪个选项
+                if (option.getKey().equals(choice)) {
+                    // 获取选项对应的score
+                    Integer score = Optional.of(option.getScore()).orElse(0);
+                    // 累加总得分
+                    totalScore += score;
+                    break;
                 }
             }
         }
@@ -65,8 +69,9 @@ public class CustomScoreScoringStrategy implements ScoringStrategy{
         ScoringResult maxScoringResult = scoringResultList.get(0);
         for (ScoringResult scoringResult : scoringResultList) {
             // 如果实际总得分大于该得分结果的结果得分范围（之前以按结果得分范围降序排列），则该总得分就在该得分结果对应的分数区间内
-            if(totalScore > scoringResult.getResultScoreRange()){
+            if(totalScore >= scoringResult.getResultScoreRange()){
                 maxScoringResult = scoringResult;
+                break;
             }
         }
         // 4.构造返回值，填充答案对象的属性。

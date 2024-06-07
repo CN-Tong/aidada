@@ -13,6 +13,7 @@ import com.tong.aidada.service.ScoringResultService;
 import javax.annotation.Resource;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 自定义测评类应用评分策略
@@ -41,25 +42,29 @@ public class CustomTestScoringStrategy implements ScoringStrategy {
         List<QuestionContentDTO> questionContentDTOList = questionVO.getQuestionContent();
         // 初始化一个Map，用于统计每个选项的个数，key：选项的result，value：个数
         HashMap<String, Integer> resultCount = new HashMap<>();
-        // 遍历题目列表
-        for (QuestionContentDTO questionContentDTO : questionContentDTOList) {
-            // 遍历用户选择列表
-            for (String choice : choices) {
-                // 获取每道题目的选项
-                List<QuestionContentDTO.Option> optionList = questionContentDTO.getOptions();
-                // 遍历题目选项列表
-                for (QuestionContentDTO.Option option : optionList) {
-                    // 判断用户选的是哪个选项
-                    if (option.getKey().equals(choice)) {
-                        // 获取选项对应的result
-                        String result = option.getResult();
-                        // 如果result属性不在resultCount中，则初始化个数为0
-                        if (!resultCount.containsKey(result)) {
-                            resultCount.put(result, 0);
-                        }
-                        // 增加resultCount中的个数
-                        resultCount.put(result, resultCount.get(result) + 1);
+        int choicesNum = choices.size();
+        int questionNum = questionContentDTOList.size();
+        // 遍历每一道题
+        for (int i = 0; i <Math.min(choicesNum, questionNum); i++) {
+            // 获取第 i 道 question
+            QuestionContentDTO questionContentDTO = questionContentDTOList.get(i);
+            // 获取第 i 个 choice
+            String choice = choices.get(i);
+            // 获取第 i 道 question 的选项
+            List<QuestionContentDTO.Option> optionList = questionContentDTO.getOptions();
+            // 遍历题目选项列表
+            for (QuestionContentDTO.Option option : optionList) {
+                // 判断用户选的是哪个选项
+                if (option.getKey().equals(choice)) {
+                    // 获取选项对应的result
+                    String result = option.getResult();
+                    // 如果result属性不在resultCount中，则初始化个数为0
+                    if (!resultCount.containsKey(result)) {
+                        resultCount.put(result, 0);
                     }
+                    // 增加resultCount中的个数
+                    resultCount.put(result, resultCount.get(result) + 1);
+                    break;
                 }
             }
         }

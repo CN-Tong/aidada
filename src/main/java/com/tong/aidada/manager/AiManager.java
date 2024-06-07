@@ -23,6 +23,8 @@ public class AiManager {
     @Resource
     private ClientV4 clientV4;
 
+    public static final Integer MAX_TOKEN = 4096;
+
     // 较稳定的随机数
     private static final float STABLE_TEMPERATURE = 0.05f;
 
@@ -39,7 +41,7 @@ public class AiManager {
     public String doRequest(List<ChatMessage> messages, Boolean stream, Float temperature) {
         // 构造请求
         ChatCompletionRequest chatCompletionRequest = ChatCompletionRequest.builder()
-                .maxTokens(8192)
+                .maxTokens(MAX_TOKEN)
                 .model(Constants.ModelChatGLM4)
                 .stream(stream)
                 .invokeMethod(Constants.invokeMethod)

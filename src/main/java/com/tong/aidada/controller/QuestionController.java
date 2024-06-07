@@ -1,5 +1,6 @@
 package com.tong.aidada.controller;
 
+import cn.hutool.json.JSONException;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tong.aidada.annotation.AuthCheck;
@@ -254,22 +255,25 @@ public class QuestionController {
     // 系统Prompt
     private static final String GENERATE_QUESTION_SYSTEM_MESSAGE = "你是一位严谨的出题专家，我会给你如下信息：\n" +
             "```\n" +
-            "应用名称，\n" +
-            "【【【应用描述】】】，\n" +
-            "应用类别，\n" +
-            "要生成的题目数，\n" +
-            "每个题目的选项数\n" +
+            "应用名称 appName，\n" +
+            "【【【应用描述 appDesc】】】，\n" +
+            "应用类别 appType，\n" +
+            "要生成的题目数 titleNum，\n" +
+            "每个题目的选项数 optionNum\n" +
             "```\n" +
             "\n" +
             "请你根据上述信息，按照以下步骤来出题：\n" +
-            "1. 要求：题目和选项尽可能地短，题目不要包含序号。要生成的题目数以及每个题目的选项数必须严格等于我上面提供的，题目不能重复，应用类别为测评类的题目以开放题为主，应用类别为得分类的题目以客观题为主。出的题目要与应用名称相关，并参考应用描述\n" +
-            "2. 严格按照下面的 json 格式输出题目和选项\n" +
+            "1. 严格按照下面的 json 格式输出题目和选项\n" +
             "```\n" +
-            "[{\"options\":[{\"result\":\"答案属性，例如 MBTI E/I、S/N、T/F、J/P中的I\",\"score\":10,\"value\":\"选项内容\",\"key\":\"A\"},{\"result\":\"答案属性，例如 MBTI E/I、S/N、T/F、J/P中的N\",\"score\":20,\"value\":\"\",\"key\":\"B\"}],\"title\":\"题目标题\"}]\n" +
+            "[{\"options\":[{\"result\":\"选项属性，例如 MBTI E/I、S/N、T/F、J/P中的E\",\"score\":10,\"value\":\"选项内容\",\"key\":\"选项标识，例如 A\"},{\"result\":\"选项属性，例如 MBTI E/I、S/N、T/F、J/P中的I\",\"score\":0,\"value\":\"选项内容\",\"key\":\"选项标识，例如 B\"}],\"title\":\"题目标题\"},{\"options\":[{\"result\":\"选项属性，例如 MBTI E/I、S/N、T/F、J/P中的T\",\"score\":0,\"value\":\"选项内容\",\"key\":\"选项标识，例如 A\"},{\"result\":\"选项属性，例如 MBTI E/I、S/N、T/F、J/P中的F\",\"score\":20,\"value\":\"选项内容\",\"key\":\"选项标识，例如 B\"}],\"title\":\"题目标题\"}]\n" +
             "```\n" +
-            "其中 title 是题目，必须提供。options 是选项。如果应用类别是测评类则必须提供 result 来保存答案属性而不提供 score，如果应用类别是得分类则必须提供 score 来设置本题分数（保证同一道题的各个选项分数相等，当做这道题目的分数，同时保证所有题目的分数之和为100）而不提供 result。每个选项的 key 按照英文字母序（比如 A、B、C、D）以此类推，必须提供。value 是选项内容，必须提供\n" +
-            "3. 检查题目是否包含序号，若包含序号则去除序号\n" +
-            "4. 返回的题目列表格式必须为 JSON 数组";
+            "其中 title 是题目，必须帮我提供。options 是题目对应的选项，一个 title 必须有 titleNum 个 options。key 是选项标识，按照英文字母序（比如 A、B、C、D）以此类推，必须帮我提供。value 是选项内容，必须帮我提供，答题者会根据选项内容判断是否选择该项。如果 appType 是```测评类```则 result 必须帮我提供，score 设置为 0。如果 appType 是```得分类```则 score 必须帮我提供，result 设置为 \"\"。\n" +
+            "2. 根据 appName 和 appDesc 生成 titleNum 个 title。title 尽可能地短，不能重复。appType 为```测评类```的题目以开放题为主，appType 为```得分类```的题目以客观题为主。\n" +
+            "3. 严格根据我提供的 optionNum 按英文字母序生成 key\n" +
+            "4. 如果 appType 是```测评类```，则为每个 key 生成 value，每个 value 均为对题目的主观回答。value 尽可能短。\n" +
+            "5. 如果 appType 是```得分类```，则回答一遍 title，得到每道 title 在数学上和逻辑上的正确答案，并分配给对应 title 某个随机的 key 的 value。随后为该 title 的其他 value 分配错误答案。value 尽可能短，每个 title 的选项不能重复。\n" +
+            "6. 检查题目是否包含序号，若包含序号则去除序号。\n" +
+            "7. 返回的题目列表格式必须为 JSON 数组。";
 
     /**
      * 生成题目的用户消息
@@ -317,8 +321,13 @@ public class QuestionController {
         String questionContentStr = result.substring(start, end + 1);
         System.out.println("成功生成题目内容：" + questionContentStr);
         // json转questionContentDTO列表
-        List<QuestionContentDTO> questionContentDTOList = JSONUtil.toList(questionContentStr, QuestionContentDTO.class);
-        return ResultUtils.success(questionContentDTOList);
+        try {
+            List<QuestionContentDTO> questionContentDTOList = JSONUtil.toList(questionContentStr, QuestionContentDTO.class);
+            return ResultUtils.success(questionContentDTOList);
+        } catch (JSONException e) {
+            e.printStackTrace();
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成的题目格式错误，请减少题目数量和选项数量，或修改应用名称和应用描述后重试");
+        }
     }
 
     // endregion
