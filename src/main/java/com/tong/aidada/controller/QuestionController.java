@@ -18,12 +18,14 @@ import com.tong.aidada.model.entity.App;
 import com.tong.aidada.model.entity.Question;
 import com.tong.aidada.model.entity.User;
 import com.tong.aidada.model.enums.AppTypeEnum;
+import com.tong.aidada.model.enums.UserRoleEnum;
 import com.tong.aidada.model.vo.QuestionVO;
 import com.tong.aidada.service.AppService;
 import com.tong.aidada.service.QuestionService;
 import com.tong.aidada.service.UserService;
 import com.zhipu.oapi.service.v4.model.ModelData;
 import io.reactivex.Flowable;
+import io.reactivex.Scheduler;
 import io.reactivex.schedulers.Schedulers;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -55,6 +57,9 @@ public class QuestionController {
 
     @Resource
     private AiManager aiManager;
+
+    @Resource
+    private Scheduler vipScheduler;
 
     // region 增删改查
 
@@ -344,7 +349,8 @@ public class QuestionController {
      * @return
      */
     @GetMapping("/ai_generate/sse")
-    public SseEmitter aiGenerateQuestionSSE(AiGenerateQuestionRequest aiGenerateQuestionRequest) {
+    public SseEmitter aiGenerateQuestionSSE(AiGenerateQuestionRequest aiGenerateQuestionRequest,
+                                            HttpServletRequest request) {
         // 校验aiGenerateQuestionRequest
         ThrowUtils.throwIf(aiGenerateQuestionRequest == null, ErrorCode.PARAMS_ERROR);
         // 获取参数
@@ -365,9 +371,19 @@ public class QuestionController {
         AtomicInteger counter = new AtomicInteger(0);
         // 用于拼接完整题目
         StringBuilder contentBuilder = new StringBuilder();
+
+        // 线程隔离
+        // 默认全局线程池
+        Scheduler scheduler = Schedulers.io();
+        User loginUser = userService.getLoginUser(request);
+        // 如果用户是 admin，则使用定制线程池
+        if (UserRoleEnum.ADMIN.getValue().equals(loginUser.getUserRole())) {
+            scheduler = vipScheduler;
+        }
+
         modelDataFlowable
                 // 异步线程池执行
-                .observeOn(Schedulers.io())
+                .observeOn(scheduler)
                 // 拿到每个数据
                 .map(modelData -> modelData.getChoices().get(0).getDelta().getContent())
                 // 特殊字符过滤为空字符
