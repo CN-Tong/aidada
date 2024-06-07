@@ -4,10 +4,8 @@ import com.tong.aidada.common.ErrorCode;
 import com.tong.aidada.exception.BusinessException;
 import com.zhipu.oapi.ClientV4;
 import com.zhipu.oapi.Constants;
-import com.zhipu.oapi.service.v4.model.ChatCompletionRequest;
-import com.zhipu.oapi.service.v4.model.ChatMessage;
-import com.zhipu.oapi.service.v4.model.ChatMessageRole;
-import com.zhipu.oapi.service.v4.model.ModelApiResponse;
+import com.zhipu.oapi.service.v4.model.*;
+import io.reactivex.Flowable;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -23,13 +21,17 @@ public class AiManager {
     @Resource
     private ClientV4 clientV4;
 
-    public static final Integer MAX_TOKEN = 4096;
+    private static final Integer MAX_TOKEN = 4096;
+
+    private static final String AI_MODEL = Constants.ModelChatGLM4;
 
     // 较稳定的随机数
     private static final float STABLE_TEMPERATURE = 0.05f;
 
     // 不稳定的随机数
     private static final float UNSTABLE_TEMPERATURE = 0.99f;
+
+    // region 同步请求
 
     /**
      * 通用请求，可自定义消息、是否流式、随机数：
@@ -42,7 +44,7 @@ public class AiManager {
         // 构造请求
         ChatCompletionRequest chatCompletionRequest = ChatCompletionRequest.builder()
                 .maxTokens(MAX_TOKEN)
-                .model(Constants.ModelChatGLM4)
+                .model(AI_MODEL)
                 .stream(stream)
                 .invokeMethod(Constants.invokeMethod)
                 .temperature(temperature)
@@ -108,4 +110,71 @@ public class AiManager {
     public String doSyncUnstableRequest(String systemMessage, String userMessage) {
         return doSyncRequest(systemMessage, userMessage, UNSTABLE_TEMPERATURE);
     }
+
+    // endregion
+
+    // region 流式请求
+
+    /**
+     * 通用流式请求
+     *
+     * @param messages
+     * @param temperature
+     * @return
+     */
+    public Flowable<ModelData> doStreamRequest(List<ChatMessage> messages, Float temperature) {
+        // 构造请求
+        ChatCompletionRequest chatCompletionRequest = ChatCompletionRequest.builder()
+                .maxTokens(MAX_TOKEN)
+                .model(AI_MODEL)
+                .stream(Boolean.TRUE)
+                .invokeMethod(Constants.invokeMethod)
+                .temperature(temperature)
+                .messages(messages)
+                .build();
+        ModelApiResponse invokeModelApiResp = clientV4.invokeModelApi(chatCompletionRequest);
+        return invokeModelApiResp.getFlowable();
+    }
+
+    /**
+     * 通用流式请求（简化消息传递）
+     *
+     * @param systemMessage
+     * @param userMessage
+     * @param temperature
+     * @return
+     */
+    public Flowable<ModelData> doStreamRequest(String systemMessage, String userMessage, Float temperature) {
+        // 构造请求
+        List<ChatMessage> messages = new ArrayList<>();
+        ChatMessage systemChatMessage = new ChatMessage(ChatMessageRole.SYSTEM.value(), systemMessage);
+        ChatMessage userChatMessage = new ChatMessage(ChatMessageRole.USER.value(), userMessage);
+        messages.add(systemChatMessage);
+        messages.add(userChatMessage);
+        return doStreamRequest(messages, temperature);
+    }
+
+    /**
+     * 通用流式请求（答案较稳定）
+     *
+     * @param systemMessage
+     * @param userMessage
+     * @return
+     */
+    public Flowable<ModelData> doStreamStableRequest(String systemMessage, String userMessage) {
+        return doStreamRequest(systemMessage, userMessage, STABLE_TEMPERATURE);
+    }
+
+    /**
+     * 通用流式请求（答案较随机）
+     *
+     * @param systemMessage
+     * @param userMessage
+     * @return
+     */
+    public Flowable<ModelData> doStreamUnstableRequest(String systemMessage, String userMessage) {
+        return doStreamRequest(systemMessage, userMessage, UNSTABLE_TEMPERATURE);
+    }
+
+    // endregion
 }

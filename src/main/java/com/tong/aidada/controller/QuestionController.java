@@ -1,5 +1,6 @@
 package com.tong.aidada.controller;
 
+import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONException;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -21,13 +22,19 @@ import com.tong.aidada.model.vo.QuestionVO;
 import com.tong.aidada.service.AppService;
 import com.tong.aidada.service.QuestionService;
 import com.tong.aidada.service.UserService;
+import com.zhipu.oapi.service.v4.model.ModelData;
+import io.reactivex.Flowable;
+import io.reactivex.schedulers.Schedulers;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 题目接口
@@ -311,7 +318,7 @@ public class QuestionController {
         // 获取应用信息
         App app = appService.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
-        // 封装Promot
+        // 封装 Prompt
         String userMessage = getGenerateQuestionUserMessage(app, questionNumber, optionNumber);
         // AI生成（通用不稳定同步请求）
         String result = aiManager.doSyncUnstableRequest(GENERATE_QUESTION_SYSTEM_MESSAGE, userMessage);
@@ -328,6 +335,80 @@ public class QuestionController {
             e.printStackTrace();
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成的题目格式错误，请减少题目数量和选项数量，或修改应用名称和应用描述后重试");
         }
+    }
+
+    /**
+     * AI实时生成题目内容
+     *
+     * @param aiGenerateQuestionRequest
+     * @return
+     */
+    @GetMapping("/ai_generate/sse")
+    public SseEmitter aiGenerateQuestionSSE(AiGenerateQuestionRequest aiGenerateQuestionRequest) {
+        // 校验aiGenerateQuestionRequest
+        ThrowUtils.throwIf(aiGenerateQuestionRequest == null, ErrorCode.PARAMS_ERROR);
+        // 获取参数
+        Long appId = aiGenerateQuestionRequest.getAppId();
+        int questionNumber = aiGenerateQuestionRequest.getQuestionNumber();
+        int optionNumber = aiGenerateQuestionRequest.getOptionNumber();
+        // 获取应用信息
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        // 封装 Prompt
+        String userMessage = getGenerateQuestionUserMessage(app, questionNumber, optionNumber);
+        // 建立 SSE 连接对象，0表示永不超时
+        SseEmitter sseEmitter = new SseEmitter(0L);
+        // 调用 AI 获取数据流（通用流式同步请求）
+        Flowable<ModelData> modelDataFlowable = aiManager.doStreamUnstableRequest(
+                GENERATE_QUESTION_SYSTEM_MESSAGE, userMessage);
+        // 左括号计数器，是一个元子类，除了默认值外，当回归为 0 时，表示左括号等于右括号，可以截取
+        AtomicInteger counter = new AtomicInteger(0);
+        // 用于拼接完整题目
+        StringBuilder contentBuilder = new StringBuilder();
+        modelDataFlowable
+                // 异步线程池执行
+                .observeOn(Schedulers.io())
+                // 拿到每个数据
+                .map(modelData -> modelData.getChoices().get(0).getDelta().getContent())
+                // 特殊字符过滤为空字符
+                .map(message -> message.replaceAll("\\s", ""))
+                // 过滤掉空字符
+                .filter(StrUtil::isNotBlank)
+                // 分流，将字符串转换成字符
+                .flatMap(message -> {
+                    ArrayList<Character> characterList = new ArrayList<>();
+                    for (char c : message.toCharArray()) {
+                        characterList.add(c);
+                    }
+                    return Flowable.fromIterable(characterList);
+                })
+                // 括号匹配算法，拿到生成的每一道题目
+                .doOnNext(c -> {
+                    System.out.print(c);
+                    // 如果字符是 {，计数器 + 1
+                    if (c == '{') {
+                        counter.addAndGet(1);
+                    }
+                    // 如果 counter 不为 0，则不截取，拼接题目
+                    if (counter.get() > 0) {
+                        contentBuilder.append(c);
+                    }
+                    // 如果字符是 }，计数器 - 1
+                    if (c == '}') {
+                        counter.addAndGet(-1);
+                        // 如果 counter 为 0，拼接题目，通过 SSE 返回给前端
+                        if (counter.get() == 0) {
+                            sseEmitter.send(JSONUtil.toJsonStr(contentBuilder.toString()));
+                            // 重置，准备拼接下一题
+                            contentBuilder.setLength(0);
+                        }
+                    }
+                })
+                .doOnError(e -> log.error("SSE error", e))
+                // 完成后告诉前端
+                .doOnComplete(sseEmitter::complete)
+                .subscribe();
+        return sseEmitter;
     }
 
     // endregion
